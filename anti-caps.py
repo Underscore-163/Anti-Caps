@@ -3,21 +3,39 @@ import sys
 import pystray
 import pyautogui as gui
 from PIL import Image
-from ctypes import WinDLL
 
-user32 = WinDLL('user32')
-running = True
+# Platform check
+if os.name != 'nt':
+    import tkinter.messagebox as msgbox
+    msgbox.showerror("Uh Oh!",message="Unfortunately Anti-Caps currently only works on Windows.")
+    sys.exit()
+
+from ctypes import WinDLL, windll
+
+windll.shell32.SetCurrentProcessExplicitAppUserModelID("Anti-Caps")
 
 def toggle():
-    global running
-    running = not running
-
+    global active
+    active = not active
+    if not active:
+        icon.remove_notification()
+        icon.notify("Paused Capslock blocking")
+        icon.icon=Image.open(resource_path("paused.png"))
+        icon.title="Anti-Caps (Paused)"
+        icon.update_menu()
+    else:
+        icon.remove_notification()
+        icon.icon = Image.open(resource_path("anti-caps.png"))
+        icon.title="Anti-Caps"
+        icon.update_menu()
+        icon.notify("Resumed Capslock blocking")
 
 def quit(*args):
+    global active
     global running
+    active = False
     running = False
     icon.stop()
-
 
 # Source - https://stackoverflow.com/a/13790741
 # Posted by max, modified by community. See post 'Timeline' for change history
@@ -33,26 +51,30 @@ def resource_path(relative_path):
 
     return os.path.join(base_path, relative_path)
 
-
-
-menu = pystray.Menu(
-    pystray.MenuItem(
-        text="Pause",
-        action=toggle,
-        checked=lambda arg: not running,
-    ),
-    pystray.MenuItem(
-        text="Exit",
-        action=quit,
-    )
-)
+active = True
+running = True
 
 icon = pystray.Icon(name="Anti-Caps",
+                    title="Anti-Caps",
                     icon=Image.open(resource_path("anti-caps.png")),
-                    menu=menu, )
+                    menu=pystray.Menu(
+                        pystray.MenuItem(
+                            text="Pause",
+                            action=toggle,
+                            checked=lambda arg: not active,
+                        ),
+                        pystray.MenuItem(
+                            text="Exit",
+                            action=quit,
+                        )
+                    ),
+                )
 
 icon.run_detached()
-while True:
-    while running:
+
+user32 = WinDLL('user32')
+
+while running:
+    while active:
         if user32.GetKeyState(0x14) != 0:
             gui.press('capslock')
